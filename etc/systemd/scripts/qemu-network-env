@@ -1,0 +1,143 @@
+#!/bin/bash
+#
+# QEMU Bridge-Tap Configuration Script
+# ======================================
+#
+# The IP Configuration for VM internal Network access from Host OS
+#
+# Requirement
+# ===========
+#
+# 1. 必要なパッケージ
+#  1. net-misc/bridge-utils
+#  2. net-dns/dnsmasq
+#
+# TODO
+# ====
+#
+# 1. 物理 NIC との接続ができていないので、外部から VM へ接続することはできない
+#
+#
+
+#
+# variables
+#
+VM_GATEWAY=172.29.100.1
+VM_NETMASK=24
+VM_NETWORK=172.29.100.0
+VM_DHCPRANGE=172.29.100.100,172.29.100.254
+
+DOMAIN=vm.priv.aoisakura
+
+#
+# intermidate variables
+#
+BRIDGE_DEV=br0
+DNSMASQ_PID=/var/run/dnsmasq_qemu-network-env.pid
+IPTABLES_NAT_RULE_NUM=9999
+
+#
+# utility functions
+#
+get_bridge() {
+    QEMU_BRIDGE_CONF="/etc/qemu/bridge.conf"
+    QEMU_BRIDGE_COMMENT="#"
+    QEMU_BRIDGE_KEYWORD="allow"
+
+    BRIDGE_DEV_LINE=`cat ${QEMU_BRIDGE_CONF} | grep -v "${QEMU_BRIDGE_COMMENT}"`
+
+    # output
+    BRIDGE_DEV=`echo ${BRIDGE_DEV_LINE} | grep ${QEMU_BRIDGE_KEYWORD} | cut -d' ' -f2`
+    DNSMASQ_PID=/var/run/qemu-dnsmasq-$BRIDGE_DEV.pid
+}
+
+get_masquerade_rule_number() {
+    IPTABLES_NAT_RULE_NUM=`iptables -t nat -L --line-numbers | grep MASQUERADE | grep ${VM_NETWORK}/${VM_NETMASK} | cut -d" " -f1`
+}
+
+#
+# usecase functions
+#
+setup_bridge() {
+    brctl addbr ${BRIDGE_DEV}
+    brctl stp ${BRIDGE_DEV} off
+    brctl setfd ${BRIDGE_DEV} 0
+
+    ip addr add ${VM_GATEWAY}/${VM_NETMASK} dev ${BRIDGE_DEV}
+    ip link set ${BRIDGE_DEV} up
+}
+
+teardown_bridge() {
+    ifconfig ${BRIDGE_DEV} down
+    brctl delbr ${BRIDGE_DEV}
+}
+
+setup_network_env() {
+    iptables -t nat -A POSTROUTING -s ${VM_GATEWAY}/${VM_NETMASK} -j MASQUERADE
+    # IP forwarding の有効化
+    sysctl -w net.ipv4.ip_forward=1 > /dev/null
+}
+
+teardown_network_env() {
+    get_masquerade_rule_number
+    # TODO: IPTABLES_NAT_RULE_NUM がデフォルトだったらスルーさせるか
+    iptables -t nat -D POSTROUTING ${IPTABLES_NAT_RULE_NUM}
+
+    # 他に ip forward を必要とするのがあったらダメだし...
+    #sysctl -w net.ipv4.ip_forward=0
+}
+
+start_dnsmasq() {
+    dnsmasq --strict-order \
+        --except-interface=lo \
+        --interface=$BRIDGE_DEV \
+        --domain-needed \
+        --bogus-priv \
+        --expand-hosts \
+        --server=/$DOMAIN/ \
+        --domain=$DOMAIN \
+        --listen-address=$VM_GATEWAY \
+        --bind-interfaces \
+        --dhcp-range=$VM_DHCPRANGE \
+        --conf-file="" \
+        --pid-file=$DNSMASQ_PID
+}
+
+stop_dnsmasq() {
+    kill `cat $DNSMASQ_PID`
+    rm -f $DNSMASQ_PID
+}
+
+#
+# main
+#
+get_bridge
+
+case "$1" in
+    start)
+        echo -n "Starting Internal network for QEMU: "
+
+        setup_bridge
+        setup_network_env
+        start_dnsmasq
+
+        ;;
+    stop)
+        echo -n "Stop Internal network for QEMU: "
+
+        stop_dnsmasq
+        teardown_network_env
+        teardown_bridge
+
+        ;;
+    restart|reload)
+        $0 stop
+        sleep 1
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
