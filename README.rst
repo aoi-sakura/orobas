@@ -16,15 +16,13 @@ virt-manager を使うまでもない、だけど qemu コマンドをそのま�
 構成
 ------
 
-| orobos
-| ├ cli
-| ├ etc
-| │ └ systemd
-| │ 　 ├ scripts
-| │ 　 └ system
-| └ ansible
-| 　 ├ vars
-| 　 └ roles
+* cli
+  * src
+  * tests: bats によるテスト
+* etc
+  * qemu: qemu の設定ファイル、bridge の設定など
+  * systemd: systemd で実行する script, 及び設定
+* ansible
 
 
 事前にインストールされているべきもの

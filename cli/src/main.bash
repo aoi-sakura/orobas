@@ -3,12 +3,6 @@
 #
 parse_args $@
 
-# dump
-#echo ${vm_conf[@]}
-#echo ${image_conf[@]}
-#echo ${system_conf[@]}
-#echo ${com_conf[@]}
-
 validate_option
 env_init
 

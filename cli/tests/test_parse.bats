@@ -3,8 +3,7 @@
 load _loader
 
 @test "generate mac address" {
-      image_conf["title"]="test"
-      system_conf["macaddr_prefix"]="52:54:"
+      ar "image" "title" "test"
       result="$(generate_mac_addr_from_title)"
       [ ${result} == "52:54:37:bf:48:af" ]
 }
@@ -15,8 +14,8 @@ load _loader
 }
 
 @test "filepath parse subcommand" {
-      system_conf["vm_store"]="$HOME/.local/share/orobas"
+      ar "system" "vm_store" "$HOME/.local/share/orobas"
       parse_subcommand "ubuntu_normal__c2_m1024_M5254179abd57.qcow2"
-      result=${image_conf["path"]}
+      result=$(ar "image" "path")
       [ "$result" == "ubuntu_normal__c2_m1024_M5254179abd57.qcow2" ]
 }

@@ -2,11 +2,13 @@ PREFIX := /usr/local
 
 .PHONY: install
 
-install:
-	cat cli/src/header.bash cli/src/functions.bash cli/src/main.bash > __orobas.sh
-	chmod 755 __orobas.sh
-	cp __orobas.sh $(PREFIX)/bin/orobas
-	rm __orobas.sh
+orobas:
+	cat cli/src/header.bash cli/src/functions.bash cli/src/main.bash > orobas.sh
+	chmod 755 orobas.sh
+
+install: orobas
+	cp orobas.sh $(PREFIX)/bin/orobas
+	rm orobas.sh
 
 	mkdir -p /etc/qemu /etc/systemd/scripts
 	cp etc/qemu/bridge.conf /etc/qemu/bridge.conf
